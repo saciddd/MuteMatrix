@@ -1,7 +1,10 @@
+import os
 import sqlite3
 
 class Database:
-    def __init__(self, db_name='data.db'):
+    def __init__(self):
+        base_path = os.path.abspath(os.path.dirname(__file__))
+        db_name = os.path.join(base_path, "veritabani.db")  # Veritabanı dosyanızın adı
         self.connection = sqlite3.connect(db_name)
         self.cursor = self.connection.cursor()
         self.create_table()
@@ -19,6 +22,29 @@ class Database:
                 aciklama TEXT,
                 kayit_zamani TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 bilgisayar_adi TEXT NOT NULL
+            )
+        ''')
+        
+        # Sendika takip tablosu
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sendika_kayitlari (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tc_kimlik_no TEXT NOT NULL,
+                isim_soyisim TEXT NOT NULL,
+                sendika_ismi TEXT NOT NULL,
+                islem_tarihi DATE NOT NULL,
+                islem_tipi TEXT NOT NULL,
+                kayit_zamani TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                bilgisayar_adi TEXT NOT NULL,
+                maas_donemi TEXT NOT NULL
+            )
+        ''')
+        
+        # Sendika tanımları tablosu
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sendika_tanimlari (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sendika_ismi TEXT NOT NULL UNIQUE
             )
         ''')
         self.connection.commit()
@@ -123,6 +149,83 @@ class Database:
     def delete_record(self, record_id):
         self.cursor.execute('DELETE FROM records WHERE id = ?', (record_id,))
         self.connection.commit()
+
+    # Sendika işlemleri için yeni metodlar
+    def insert_sendika_kayit(self, tc_kimlik_no, isim_soyisim, sendika_ismi, 
+                           islem_tarihi, islem_tipi, bilgisayar_adi, maas_donemi):
+        self.cursor.execute('''
+            INSERT INTO sendika_kayitlari 
+            (tc_kimlik_no, isim_soyisim, sendika_ismi, islem_tarihi, 
+             islem_tipi, bilgisayar_adi, maas_donemi)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (tc_kimlik_no, isim_soyisim, sendika_ismi, islem_tarihi, 
+              islem_tipi, bilgisayar_adi, maas_donemi))
+        self.connection.commit()
+
+    def get_sendika_kayitlari(self, yil=None, ay=None):
+        query = '''
+            SELECT * FROM sendika_kayitlari 
+            WHERE 1=1
+        '''
+        params = []
+        
+        if yil is not None and ay is not None:
+            maas_donemi = f"{int(yil)}-{int(ay):02d}"
+            query += ' AND maas_donemi = ?'
+            params.append(maas_donemi)
+            
+        query += ' ORDER BY kayit_zamani DESC'
+        
+        self.cursor.execute(query, params)
+        return self.cursor.fetchall()
+
+    def get_sendika_tanimlari(self):
+        self.cursor.execute('SELECT sendika_ismi FROM sendika_tanimlari ORDER BY sendika_ismi')
+        return [row[0] for row in self.cursor.fetchall()]
+
+    def add_sendika_tanimi(self, sendika_ismi):
+        try:
+            self.cursor.execute('INSERT INTO sendika_tanimlari (sendika_ismi) VALUES (?)', 
+                              (sendika_ismi,))
+            self.connection.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def delete_sendika_tanimi(self, sendika_ismi):
+        self.cursor.execute('DELETE FROM sendika_tanimlari WHERE sendika_ismi = ?', 
+                          (sendika_ismi,))
+        self.connection.commit()
+
+    def check_ayrilma_kaydi(self, tc_kimlik_no, baslangic_tarihi, bitis_tarihi):
+        """Belirtilen tarih aralığında ayrılış kaydı var mı kontrol eder"""
+        self.cursor.execute('''
+            SELECT COUNT(*) FROM sendika_kayitlari
+            WHERE tc_kimlik_no = ?
+            AND islem_tipi = 'Ayrılış'
+            AND islem_tarihi BETWEEN ? AND ?
+        ''', (tc_kimlik_no, baslangic_tarihi, bitis_tarihi))
+        
+        return self.cursor.fetchone()[0] > 0
+
+    def update_sendika_kayit(self, old_tc_no, tc_no, isim, sendika, tarih, islem_tipi, maas_donemi):
+        self.cursor.execute('''
+            UPDATE sendika_kayitlari 
+            SET tc_kimlik_no = ?, 
+                isim_soyisim = ?, 
+                sendika_ismi = ?, 
+                islem_tarihi = ?,
+                islem_tipi = ?,
+                maas_donemi = ?
+            WHERE tc_kimlik_no = ?
+        ''', (tc_no, isim, sendika, tarih, islem_tipi, maas_donemi, old_tc_no))
+        self.connection.commit()
+        return True
+
+    def delete_sendika_kayit(self, tc_no):
+        self.cursor.execute('DELETE FROM sendika_kayitlari WHERE tc_kimlik_no = ?', (tc_no,))
+        self.connection.commit()
+        return True
 
     def close(self):
         self.connection.close()

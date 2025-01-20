@@ -7,6 +7,7 @@ class IslemTanimlariWindow(ttk.Toplevel):
         self.table_controller = table_controller
         self.title("İşlem Tanımları")
         self.geometry("500x600")
+        #self.iconbitmap("desktop-app/src/ui/MuteMatrix.ico")
         
         self.colors = [
             ("Varsayılan", "default"),

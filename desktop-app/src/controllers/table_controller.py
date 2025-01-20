@@ -5,11 +5,11 @@ class TableController:
     def __init__(self, table_view):
         self.table_view = table_view
         self.database = Database()
-        self.load_data()
 
     def load_data(self):
-        data = self.database.fetch_all_records()
-        self.table_view.display_data(data)
+        if self.table_view:
+            data = self.database.fetch_all_records()
+            self.table_view.display_data(data)
 
     def update_table(self):
         self.load_data()

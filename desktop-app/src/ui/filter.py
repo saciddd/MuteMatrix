@@ -18,6 +18,10 @@ class FilterFrame(ttk.Frame):
         self.filter_entry.pack(side="left", padx=5)
         self.filter_entry.bind("<KeyRelease>", self.on_filter_change)
 
+        # Tüm Kayıtlar butonu
+        self.show_all_button = ttk.Button(search_frame, text="Tüm Kayıtlar", command=self.show_all_records)
+        self.show_all_button.pack(side="left", padx=5)
+        
         # Right side - Export buttons
         export_frame = ttk.Frame(self)
         export_frame.pack(side="right", fill="y")
@@ -31,6 +35,10 @@ class FilterFrame(ttk.Frame):
     def on_filter_change(self, event):
         filter_text = self.filter_entry.get()
         self.table_controller.apply_filter(filter_text)
+
+    def show_all_records(self):
+        self.filter_entry.delete(0, "end")
+        self.on_filter_change(None)
 
     def get_visible_records(self):
         # Get currently visible records from the table
